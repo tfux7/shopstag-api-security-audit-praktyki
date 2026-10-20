@@ -1,0 +1,12 @@
+ID;Kategoria;Nazwa scenariusza;Endpoint;Oczekiwany rezultat;Wynik testu / Status
+TC-AUTH-01;Uwierzytelnianie;Logowanie na konto administratora;POST /auth/login;Kod 200 OK z JWT lub czytelna walidacja 4xx;DEFEKT (Fail / High) - Błąd serwera 500
+TC-LOG-02;Walidacja;Ujemne parametry zapytania (limit=-1);GET /products;Kod 422 Unprocessable Entity;DEFEKT (Fail / Medium) - Błąd serwera 500
+TC-SEC-01;Bezpieczeństwo;Sanityzacja znaków specjalnych w search;GET /products;Kod 200 OK z poprawnym filtrowaniem lub pustą listą;ZALICZONY (Pass)
+TC-SEC-02;Nagłówki;Weryfikacja nagłówków CORS i polityki X-Frame;N/A;Brak konfliktów nagłówków i wycieku zaufania;ZALICZONY (Pass)
+TC-SEC-03;Bezpieczeństwo;Ochrona przed Brute-Force (Rate Limiting);POST /auth/login;Kod 429 Too Many Requests po przekroczeniu limitu;ZALICZONY (Pass)
+TC-IDOR-01;Autoryzacja;Próba odczytu nieistniejącego/obcego zamówienia;GET /orders/{id};Kod 404 Not Found (Ochrona przed IDOR/BOLA);ZALICZONY (Pass)
+TC-SEC-04;Zarządzanie Sesją;Unieważnianie tokenu JWT po wylogowaniu;POST /auth/logout;Kod 401 Unauthorized dla kolejnych zapytań z tokenem;ZALICZONY (Pass)
+TC-AUTH-03;Autoryzacja;Zapytanie chronione bez nagłówka Auth;GET /users/me;Kod 401 Unauthorized;ZALICZONY (Pass)
+TC-METH-01;Protokół;Użycie niedozwolonej metody HTTP;PUT /auth/login;Kod 405 Method Not Allowed;ZALICZONY (Pass)
+TC-VAL-03;Walidacja;Niezgodność typów danych w JSON;POST /cart/items;Kod 422 Unprocessable Entity ze strukturyzowanym błędem;ZALICZONY (Pass)
+TC-HDR-01;Nagłówki;Przesłanie błędnego Content-Type (text/plain);POST /auth/login;Kod 415 lub 422 Unprocessable Entity;ZALICZONY (Pass)reports/test_execution_matrix.csvreports/test_execution_matrix.csv

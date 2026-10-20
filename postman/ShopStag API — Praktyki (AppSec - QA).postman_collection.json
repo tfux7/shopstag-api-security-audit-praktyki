@@ -1,0 +1,803 @@
+{
+  "info": {
+    "_postman_id": "4b98f3c3-e23f-44a6-9063-bd972bf8348c",
+    "name": "ShopStag API — Praktyki (AppSec / QA)",
+    "description": "Kolekcja startowa dla praktykantów ShopStag.\n\nCel: nauka eksploracji API, testów autoryzacji (IDOR/RBAC), walidacji danych i logiki biznesowej sklepu.\n\nJak zacząć:\n1. Wybierz środowisko `ShopStag CI` (plik ShopStag_CI.postman_environment.json).\n2. Odpal `Auth / Login (admin)` oraz `Auth / Login (user)` — skrypty testowe zapiszą tokeny do zmiennych środowiskowych (`admin_token`, `user_token`).\n3. Reszta requestów używa `{{admin_token}}` lub `{{user_token}}` automatycznie.\n\nWAŻNE (zasady): testujemy WYŁĄCZNIE na środowisku CI/staging (`shopstag-ci.fullstag.pl`), na kontach testowych. Nie ruszamy produkcji ani danych realnych klientów. Nie odpalamy skanerów aktywnych z tej kolekcji — to zestaw do ręcznej, świadomej eksploracji.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "54792322",
+    "_collection_link": "https://go.postman.co/collection/54792322-4b98f3c3-e23f-44a6-9063-bd972bf8348c?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login (admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));\nconst b = pm.response.json();\nif (b.access_token) {\n  pm.environment.set('admin_token', b.access_token);\n  console.log('admin_token zapisany');\n}\npm.test('Payload JWT nie zawiera hasla', () => {\n  pm.expect(JSON.stringify(b)).to.not.include('hashed_password');\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Logowanie admina. UWAGA: backend przyjmuje JSON `{email, password}` (schemat UserLogin), NIE form-data `username/password`. Skrypt testowy zapisuje access_token do zmiennej `admin_token`."
+          },
+          "response": []
+        },
+        {
+          "name": "Login (user)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "if (b.access_token) { pm.environment.set('user_token', b.access_token); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login — bledne haslo (oczekiwane 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 przy blednym hasle', () => pm.response.to.have.status(401));",
+                  "pm.test('Brak wycieku, ktory user istnieje (ten sam komunikat)', () => {",
+                  "  pm.expect(pm.response.text()).to.include('Nieprawid');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"zle-haslo-123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Ćwiczenie: enumeracja użytkowników. Sprawdź, czy komunikat błędu jest taki sam dla nieistniejącego e-maila i dla istniejącego e-maila z błędnym hasłem. Różnica = user enumeration."
+          },
+          "response": []
+        },
+        {
+          "name": "Register (B2C)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test_praktykant@example.com\",\n  \"password\": \"Testy2026!\",\n  \"password_confirm\": \"Testy2026!\",\n  \"type\": \"b2c\"\n}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Rate limit: 5/min per IP. Ćwiczenie: sprawdź walidację (min. 8 znaków hasła, zgodność password/password_confirm), oraz co się dzieje przy ponownej rejestracji tego samego e-maila."
+          },
+          "response": []
+        },
+        {
+          "name": "Me / moje sesje",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{user_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/sessions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "sessions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": ""
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Katalog (public)",
+      "item": [
+        {
+          "name": "Lista kategorii",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/categories",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "categories"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Lista produktow (paginacja)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));\nconst arr = pm.response.json();\nif (Array.isArray(arr) && arr.length) {\n  pm.collectionVariables.set('product_id', arr[0].id);\n  if (arr[0].slug) pm.collectionVariables.set('product_slug', arr[0].slug);\n}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "[https://evil-attacker-site.com](https://evil-attacker-site.com)"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/products?skip=0&limit=1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "skip",
+                  "value": "0"
+                },
+                {
+                  "key": "limit",
+                  "value": "1"
+                },
+                {
+                  "key": "search",
+                  "value": "<script>alert(1)</script>",
+                  "disabled": true
+                },
+                {
+                  "key": "category_id",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "is_sale",
+                  "value": "true",
+                  "disabled": true
+                },
+                {
+                  "key": "price_max",
+                  "value": "-1",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Zapisuje pierwszy product_id/slug do zmiennych. Ćwiczenie wydajnościowe: zmierz czas przy limit=12 vs limit=100 (podejrzenie N+1 przy category_path / recenzjach)."
+          },
+          "response": []
+        },
+        {
+          "name": "Szczegoly produktu (slug lub id)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/products/{{product_slug}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products",
+                "{{product_slug}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Historia cen (Omnibus)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/products/{{product_id}}/price-history",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products",
+                "{{product_id}}",
+                "price-history"
+              ]
+            },
+            "description": "Endpoint publiczny — bez autoryzacji. Ćwiczenie: czy `lowest_price_30_days` na PDP zgadza się z minimum z tej historii? (dyrektywa Omnibus)."
+          },
+          "response": []
+        },
+        {
+          "name": "Wyszukiwanie (SQLi probe — reczne)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/products?search=test' OR '1'='1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "test' OR '1'='1"
+                }
+              ]
+            },
+            "description": "Ćwiczenie AppSec (black-box): poprawnie zabezpieczony endpoint potraktuje to jako zwykły tekst wyszukiwania i zwróci 200 z normalną/pustą listą. Sygnały do zgłoszenia: 500 z tracebackiem SQL, wyciek WSZYSTKICH rekordów (obejście filtra), albo błąd bazy w odpowiedzi. Spróbuj też wariantów w innych parametrach (category_id, sort)."
+          },
+          "response": []
+        },
+        {
+          "name": "Feed produktowy (XML)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/feed.xml",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "feed.xml"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Koszyk i zamowienia",
+      "item": [
+        {
+          "name": "Walidacja kodu rabatowego",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{discount_code}}\",\n  \"cart_total\": 100.0,\n  \"currency\": \"PLN\",\n  \"product_ids\": []\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/discount-codes/validate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "discount-codes",
+                "validate"
+              ]
+            },
+            "description": "Ćwiczenie logiki biznesowej: czy da się użyć kodu poniżej progu minimalnego? Czy kod dla wybranych product_ids waliduje się przy pustym koszyku? Czy odpowiedź ujawnia typ/wartość kodu, którego nie powinno się znać?"
+          },
+          "response": []
+        },
+        {
+          "name": "Utworz zamowienie (gosc)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "  const b = pm.response.json();",
+                  "  if (b.id) pm.collectionVariables.set('order_id', b.id);",
+                  "  if (b.access_token) pm.collectionVariables.set('order_token', b.access_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"guest_email\": \"gosc+{{$timestamp}}@example.com\",\n  \"first_name\": \"Jan\",\n  \"last_name\": \"Testowy\",\n  \"phone\": \"600100200\",\n  \"guest_address\": {\"street\": \"Testowa 1\", \"city\": \"Warszawa\", \"postal_code\": \"00-001\", \"country\": \"PL\"},\n  \"items\": [{\"product_id\": {{product_id}}, \"quantity\": 1}],\n  \"payment_method\": \"cod\",\n  \"accept_terms\": true,\n  \"accept_courier_terms\": true,\n  \"currency_code\": \"PLN\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders"
+              ]
+            },
+            "description": "Ćwiczenie KRYTYCZNE (price tampering): spróbuj dodać do items pole `price`/`unit_price`/`total` z zaniżoną wartością i sprawdź w odpowiedzi, po jakiej cenie zostało policzone zamówienie. Poprawny system liczy cenę serwerowo z katalogu i ignoruje cenę z requestu. Jeśli zapłacisz swoją cenę = Critical. Powtórz dla produktów konfigurowalnych, zestawów i ofert."
+          },
+          "response": []
+        },
+        {
+          "name": "Podglad zamowienia (wlasciciel/token)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}?token={{order_token}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                "{{order_id}}"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "{{order_token}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "IDOR probe — cudze zamowienie bez tokenu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Cudze zamowienie NIE jest dostepne (403/404)', () => {\n  pm.expect([403, 404]).to.include(pm.response.code);\n});\n// Jesli 200 -> LUKA IDOR: zglos w standardowym formacie."
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{user_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/2",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                "2"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Zaloguj się jako zwykły user (user_token), potem poproś o zamówienie o niskim ID (prawdopodobnie cudze), bez tokenu dostępu. Oczekiwany wynik: 403/404. 200 z danymi = IDOR."
+          },
+          "response": []
+        },
+        {
+          "name": "Faktura PDF (wymaga tokenu)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}/invoice-pdf?token={{order_token}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                "{{order_id}}",
+                "invoice-pdf"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "{{order_token}}"
+                }
+              ]
+            },
+            "description": "Ćwiczenie: usuń parametr token i sprawdź, czy PDF nadal się generuje. Powinien być odrzucony."
+          },
+          "response": []
+        },
+        {
+          "name": "New Request",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": ""
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Platnosci (webhooki)",
+      "item": [
+        {
+          "name": "iMoje — metody platnosci",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/payments/imoje/methods",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "payments",
+                "imoje",
+                "methods"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "iMoje webhook — bez podpisu (oczekiwane 400/403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Webhook bez podpisu odrzucony', () => {",
+                  "  pm.expect([400, 403]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction\": {\"status\": \"settled\", \"orderId\": \"1\"}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/payments/imoje/notification",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "payments",
+                "imoje",
+                "notification"
+              ]
+            },
+            "description": "Ćwiczenie AppSec (forged payment confirmation) — wykonuj na SANDBOXIE iMoje, nie na żywej bramce. Próba oznaczenia zamówienia jako opłacone bez ważnego podpisu (nagłówek x-imoje-signature) i spoza zaufanego źródła. System MUSI to odrzucić (400/403) i NIE zmienić statusu zamówienia. To najgroźniejszy scenariusz w e-commerce — 'darmowe zamówienia'. Powtórz analogicznie dla p24/paypal."
+          },
+          "response": []
+        },
+        {
+          "name": "New Request",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": ""
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin (RBAC)",
+      "item": [
+        {
+          "name": "Site config (admin OK)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/site-config",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "site-config"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Lista uzytkownikow (admin OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  ""
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "users"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "RBAC probe — user probuje liste userow (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Zwykly user NIE widzi listy userow (401/403)', () => {",
+                  "  pm.expect([401, 403]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{user_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "users"
+              ]
+            },
+            "description": "Ćwiczenie RBAC: zwykłe konto próbuje endpointu zarządczego. Oczekiwane 403. Powtórz dla innych operacji admina (create/update/delete produktu, /admin/*)."
+          },
+          "response": []
+        },
+        {
+          "name": "RBAC probe — brak tokenu (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Bez tokenu -> 401', () => pm.expect([401,403]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "users"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "New Request",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": ""
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "product_slug",
+      "value": ""
+    },
+    {
+      "key": "product_id",
+      "value": ""
+    },
+    {
+      "key": "category_id",
+      "value": ""
+    },
+    {
+      "key": "order_id",
+      "value": ""
+    },
+    {
+      "key": "order_token",
+      "value": ""
+    },
+    {
+      "key": "discount_code",
+      "value": ""
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    }
+  ]
+}
